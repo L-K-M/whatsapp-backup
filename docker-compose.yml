@@ -1,0 +1,16 @@
+services:
+  whatsapp-backup:
+    build: .
+    container_name: whatsapp-backup
+    volumes:
+      # Persist the wacli store (session, messages, media) on the host
+      - ./data:/data
+    environment:
+      # Optional: label shown in WhatsApp's Linked Devices list
+      WACLI_DEVICE_LABEL: "whatsapp-backup"
+      # Optional: set to "1" to prevent any writes to WhatsApp or the local store
+      # WACLI_READONLY: "1"
+    restart: unless-stopped
+    # tty and stdin_open are required only for the initial `auth` step (QR code display)
+    tty: true
+    stdin_open: true

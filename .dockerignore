@@ -1,0 +1,7 @@
+# Ignore host build artifacts and data directory
+data/
+dist/
+
+# Git metadata not needed inside the image
+.git/
+.gitignore
