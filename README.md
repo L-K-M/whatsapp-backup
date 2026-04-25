@@ -2,11 +2,10 @@
 
 Dockerized WhatsApp backup service built around [`steipete/wacli`](https://github.com/steipete/wacli). It exposes a local web UI for QR login, sync status, browsing, and searching backed-up messages.
 
-![Screenshot of the web UI](./screenshot.png)
+> [!CAUTION]
+> Do not expose this service directly to the Internet. It does not implement any authentication or security measures, and the WhatsApp session it manages has access to all your messages and media. Use it only on a trusted local network or behind a secure VPN.
 
-<div style="background-color: #f8d7da; border: 1px solid #f5c6cb; padding: 15px; border-radius: 5px; color: #721c24;">
-  <strong>Warning:</strong> Do not expose this service directly to the Internet. It does not implement any authentication or security measures, and the WhatsApp session it manages has access to all your messages and media. Use it only on a trusted local network or behind a secure VPN.
-</div>
+![Screenshot of the web UI](./screenshot.png)
 
 ## What It Does
 
