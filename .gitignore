@@ -1,0 +1,9 @@
+.DS_Store
+.env
+data/
+downloads/
+__pycache__/
+*.py[cod]
+ui/node_modules/
+ui/dist/
+node_modules/

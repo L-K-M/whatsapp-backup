@@ -1,0 +1,48 @@
+services:
+  whatsapp-backup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        WACLI_REPO: ${WACLI_REPO:-https://github.com/steipete/wacli.git}
+        WACLI_REF: ${WACLI_REF:-main}
+    image: whatsapp-backup:${IMAGE_TAG:-latest}
+    container_name: whatsapp-backup
+    environment:
+      DATA_DIR: /data
+      WACLI_STORE_DIR: /data/wacli
+      ARCHIVE_DIR: /host-data/archive
+      NOTIFICATION_STATE_FILE: /data/state/.whatsapp-backup-state.json
+      HOST: 0.0.0.0
+      PORT: 8080
+      AUTO_SYNC: ${AUTO_SYNC:-1}
+      EXPORT_INTERVAL_SECONDS: ${EXPORT_INTERVAL_SECONDS:-60}
+      SUPERVISOR_INTERVAL_SECONDS: ${SUPERVISOR_INTERVAL_SECONDS:-15}
+      SYNC_MAX_RECONNECT: ${SYNC_MAX_RECONNECT:-30m}
+      SYNC_RESTART_MIN_SECONDS: ${SYNC_RESTART_MIN_SECONDS:-300}
+      SYNC_RESTART_MAX_SECONDS: ${SYNC_RESTART_MAX_SECONDS:-3600}
+      SYNC_STABLE_SECONDS: ${SYNC_STABLE_SECONDS:-300}
+      MAX_PROCESS_LOG_LINES: ${MAX_PROCESS_LOG_LINES:-600}
+      WACLI_DEVICE_LABEL: ${WACLI_DEVICE_LABEL:-WhatsApp Backup}
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_TO: ${SMTP_TO:-}
+      SMTP_USE_TLS: ${SMTP_USE_TLS:-1}
+      SMTP_USE_SSL: ${SMTP_USE_SSL:-0}
+      SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-20}
+      SMTP_SUBJECT_PREFIX: "${SMTP_SUBJECT_PREFIX:-[WhatsApp Backup]}"
+      TZ: ${TZ:-UTC}
+    ports:
+      - "${WEB_PORT:-64009}:8080"
+    volumes:
+      - "${DATA_PATH:-./data}:/host-data"
+      - "wacli-store:/data/wacli"
+      - "app-state:/data/state"
+    restart: unless-stopped
+
+volumes:
+  wacli-store:
+  app-state:

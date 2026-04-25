@@ -1,0 +1,11 @@
+.git
+.codenomad
+.DS_Store
+data
+downloads
+node_modules
+ui/node_modules
+ui/dist
+__pycache__
+*.pyc
+.env
