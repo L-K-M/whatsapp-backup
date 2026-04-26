@@ -2,15 +2,15 @@
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg width="100%" height="100%" viewBox="0 0 2481 2481" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xml:space="preserve" xmlns:serif="http://www.serif.com/" style="fill-rule:evenodd;clip-rule:evenodd;stroke-linecap:round;stroke-linejoin:round;stroke-miterlimit:1.5;">
     <rect x="-60" y="-51" width="2602" height="2590" style="fill:rgb(36,211,102);"/>
-    <g transform="matrix(0.839773,0,0,0.839773,129.977935,76.581818)">
-        <path d="M602.324,1658.283C501.336,1515.06 442,1340.405 442,1152C442,666.315 836.315,272 1322,272C1807.685,272 2202,666.315 2202,1152C2202,1637.685 1807.685,2032 1322,2032C1133.595,2032 958.94,1972.664 815.717,1871.676L442,2032L602.324,1658.283Z" style="fill:rgb(36,211,102);stroke:white;stroke-width:99.23px;"/>
+    <g transform="matrix(0.839773,0,0,0.839773,129.977935,-46.418182)">
+        <path d="M602.324,1658.283C501.336,1515.06 442,1340.405 442,1152C442,666.315 836.315,272 1322,272C1807.685,272 2202,666.315 2202,1152C2202,1637.685 1807.685,2032 1322,2032C1133.595,2032 958.94,1972.664 815.717,1871.676L442,2032L602.324,1658.283Z" style="fill:rgb(36,211,102);stroke:white;stroke-width:198.47px;"/>
     </g>
-    <g transform="matrix(1,0,0,1,-0.84252,-123)">
+    <g transform="matrix(1,0,0,1,-0.84252,-78)">
         <g transform="matrix(1,0,0,1,-47,-31)">
-            <path d="M1516,2036L1726,2036L1288,2365L850,2036L1060,2036L1060,1075L1516,1075L1516,2036Z" style="fill:white;stroke:rgb(36,211,102);stroke-width:250px;"/>
+            <path d="M1516,2036L1726,2036L1288,2365L850,2036L1060,2036L1060,1075L1516,1075L1516,2036Z" style="fill:white;stroke:rgb(36,211,102);stroke-width:333.33px;"/>
         </g>
         <g transform="matrix(1,0,0,1,-47,-31)">
-            <path d="M1516,2036L1726,2036L1288,2365L850,2036L1060,2036L1060,1075L1516,1075L1516,2036Z" style="fill:rgb(36,211,102);stroke:white;stroke-width:83.33px;"/>
+            <path d="M1516,2036L1726,2036L1288,2365L850,2036L1060,2036L1060,1075L1516,1075L1516,2036Z" style="fill:rgb(36,211,102);stroke:white;stroke-width:166.67px;"/>
         </g>
     </g>
 </svg>
