@@ -68,15 +68,20 @@
   $: smtpInfo = notificationInfo?.smtp || {};
   $: syncControl = status?.sync_control || {};
   $: syncBackoffRemaining = Number(syncControl?.backoff_remaining_seconds || 0);
+  $: reauthRequired = Boolean(syncControl?.reauth_required);
+  $: expiredRetryPending = Boolean(syncControl?.expired_session_retry_pending);
+  $: expiredRetryRunning = Boolean(syncControl?.expired_session_retry_in_progress);
   $: activityDisplay = splitQrActivity(displayLines);
   $: terminalLogText = buildTerminalLogText(activityDisplay.logLines);
   $: statusLabel = authRunning
     ? 'Waiting for QR scan'
-    : !authenticated
-      ? 'Not logged in'
-      : syncRunning
-        ? 'Syncing messages and media'
-        : 'Logged in, sync stopped';
+    : reauthRequired
+      ? 'Login required'
+      : !authenticated
+        ? 'Not logged in'
+        : syncRunning
+          ? 'Syncing messages and media'
+          : 'Logged in, sync stopped';
   $: notificationLabel = !smtpInfo.enabled
     ? 'SMTP alerts disabled'
     : notificationInfo.outage_active
@@ -84,20 +89,28 @@
         ? `Alert sent ${formatTime(notificationInfo.last_email_sent_at)}`
         : 'Outage alert pending or failed'
       : `SMTP alerts to ${smtpInfo.to}`;
-  $: syncMeterLabel = syncRunning
-    ? 'Sync active (continuous)'
-    : syncBackoffRemaining > 0
-      ? `Reconnect backoff: ${syncBackoffRemaining}s`
-      : authenticated
-        ? 'Connected, waiting for changes'
-        : 'Not connected';
-  $: syncMeterState = syncRunning
-    ? 'active'
-    : syncBackoffRemaining > 0
-      ? 'backoff'
-      : authenticated
-        ? 'ready'
-        : 'offline';
+  $: syncMeterLabel = reauthRequired
+    ? 'Login required'
+    : expiredRetryRunning
+      ? 'Retrying expired session'
+      : expiredRetryPending
+        ? `Session retry in ${syncBackoffRemaining}s`
+        : syncRunning
+          ? 'Sync active (continuous)'
+          : syncBackoffRemaining > 0
+            ? `Reconnect backoff: ${syncBackoffRemaining}s`
+            : authenticated
+              ? 'Connected, waiting for changes'
+              : 'Not connected';
+  $: syncMeterState = reauthRequired
+    ? 'attention'
+    : syncRunning
+      ? 'active'
+      : syncBackoffRemaining > 0
+        ? 'backoff'
+        : authenticated
+          ? 'ready'
+          : 'offline';
   $: statusSummary = authenticated
     ? `${statusLabel} | ${authIdentity || 'linked account'} | ${status?.export?.last_indexed_count || 0} text records`
     : statusLabel;
@@ -499,7 +512,7 @@
         </ExpandableSection>
 
         <div class="status-actions">
-          {#if !authenticated || authRunning}
+          {#if !authenticated || authRunning || reauthRequired}
             <BalloonHelp message="Starts wacli auth and shows the WhatsApp Linked Devices QR code in this page." position="bottom" delay={500}>
               <Button onclick={startLogin} disabled={authRunning || actionPending === 'login'}>
                 {authRunning ? 'Login Running' : 'Start Login'}

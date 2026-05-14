@@ -71,6 +71,8 @@ Key `.env` values:
 - `SYNC_RESTART_MIN_SECONDS`: minimum wait before restarting `wacli sync` after an unexpected exit. Default: `300`.
 - `SYNC_RESTART_MAX_SECONDS`: maximum exponential backoff wait before restarting `wacli sync`. Default: `3600`.
 - `SYNC_STABLE_SECONDS`: running sync duration required before the app treats the connection as restored and resets alert/backoff state. Default: `300`.
+- `SYNC_RECONNECT_LOOP_PAIRS`: number of repeated `Disconnected.` / `Reconnecting...` pairs that indicate a stuck sync session. Default: `3`.
+- `SYNC_EXPIRED_SESSION_RETRY_SECONDS`: delay before one final retry after a stuck reconnect loop. Default: `10800` (3 hours).
 - `WACLI_REPO` / `WACLI_REF`: source used to build `wacli` into the image.
 
 ## SMTP Alerts
@@ -95,6 +97,8 @@ The wrapper avoids tight reconnect loops:
 
 - It runs a single `wacli sync --follow --download-media` process at a time.
 - It lets that process handle reconnects internally with `--max-reconnect` instead of spawning repeated new sessions.
+- If `wacli` repeatedly logs `Disconnected.` followed by `Reconnecting...` without reaching `Connected.`, the wrapper stops that process, waits `SYNC_EXPIRED_SESSION_RETRY_SECONDS`, and tries once more.
+- If the delayed retry also fails, the wrapper stops retrying, runs `wacli auth logout`, and sends the one-shot outage email so the user knows to log in again.
 - If `wacli sync` exits unexpectedly, the wrapper waits at least `SYNC_RESTART_MIN_SECONDS` before starting it again, then exponentially backs off up to `SYNC_RESTART_MAX_SECONDS`.
 - Manual QR login only runs when you click **Start Login** in the UI.
 

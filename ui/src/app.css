@@ -161,6 +161,10 @@ body {
   background: repeating-linear-gradient(45deg, #000 0 3px, #fff 3px 6px);
 }
 
+.sync-state-pill.attention .sync-state-dot {
+  background: #9b0000;
+}
+
 .muted {
   color: #555;
 }

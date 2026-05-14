@@ -44,6 +44,11 @@ SYNC_RESTART_MAX_SECONDS = max(
     int(os.environ.get("SYNC_RESTART_MAX_SECONDS", "3600")),
 )
 SYNC_STABLE_SECONDS = max(60, int(os.environ.get("SYNC_STABLE_SECONDS", "300")))
+SYNC_RECONNECT_LOOP_PAIRS = max(2, int(os.environ.get("SYNC_RECONNECT_LOOP_PAIRS", "3")))
+SYNC_EXPIRED_SESSION_RETRY_SECONDS = max(
+    60,
+    int(os.environ.get("SYNC_EXPIRED_SESSION_RETRY_SECONDS", "10800")),
+)
 NOTIFICATION_STATE_FILE = Path(
     os.environ.get("NOTIFICATION_STATE_FILE", str(DATA_DIR / ".whatsapp-backup-state.json"))
 ).resolve()
@@ -107,6 +112,12 @@ auth_process_started_at: Optional[str] = None
 sync_started_monotonic: Optional[float] = None
 next_sync_start_monotonic = 0.0
 sync_stop_expected = False
+sync_exit_reason: Optional[str] = None
+sync_reconnect_loop_detector: dict[str, Any] = {
+    "last_event": None,
+    "pairs": 0,
+    "detected": False,
+}
 sync_control_state: dict[str, Any] = {
     "restart_attempts": 0,
     "next_start_at": None,
@@ -118,6 +129,13 @@ sync_control_state: dict[str, Any] = {
     "restart_min_seconds": SYNC_RESTART_MIN_SECONDS,
     "restart_max_seconds": SYNC_RESTART_MAX_SECONDS,
     "max_reconnect": SYNC_MAX_RECONNECT,
+    "reconnect_loop_pairs": SYNC_RECONNECT_LOOP_PAIRS,
+    "expired_session_retry_seconds": SYNC_EXPIRED_SESSION_RETRY_SECONDS,
+    "expired_session_retry_pending": False,
+    "expired_session_retry_in_progress": False,
+    "expired_session_retry_attempted": False,
+    "reauth_required": False,
+    "last_reconnect_loop_at": None,
 }
 
 message_index: list[dict[str, Any]] = []
@@ -227,7 +245,7 @@ def send_connection_failure_email(reason: str, failed_at: str) -> Optional[str]:
         "WhatsApp Backup can no longer maintain the WhatsApp sync connection.\n\n"
         f"Failure time: {failed_at}\n"
         f"Reason: {reason}\n\n"
-        "Open the WhatsApp Backup web UI and restore the linked-device connection. "
+        "Open the WhatsApp Backup web UI and log in again from WhatsApp Linked Devices. "
         "No further email will be sent for this outage until the connection is restored.\n"
     )
 
@@ -251,7 +269,7 @@ def send_connection_failure_email(reason: str, failed_at: str) -> Optional[str]:
         return str(exc)
 
 
-def mark_connection_failure(reason: str) -> None:
+def mark_connection_failure(reason: str, force_email: bool = False) -> None:
     load_notification_state()
     failed_at = now_iso()
     should_send = False
@@ -259,7 +277,7 @@ def mark_connection_failure(reason: str) -> None:
         notification_state["last_failure_at"] = failed_at
         notification_state["last_failure_reason"] = reason
 
-        if notification_state.get("ever_restored"):
+        if notification_state.get("ever_restored") or force_email:
             if not notification_state.get("outage_active"):
                 notification_state["outage_active"] = True
                 notification_state["email_sent_for_outage"] = False
@@ -299,6 +317,7 @@ def mark_connection_restored() -> None:
         notification_state["last_failure_reason"] = ""
         notification_state["last_email_error"] = None
         notification_state["last_restored_at"] = restored_at
+        reset_expired_session_retry_locked()
         if changed:
             persist_notification_state_locked()
 
@@ -307,10 +326,11 @@ def process_running(proc: Optional[subprocess.Popen[str]]) -> bool:
     return proc is not None and proc.poll() is None
 
 
-def append_process_line(lines: deque[str], line: str) -> None:
+def append_process_line(lines: deque[str], line: str) -> str:
     cleaned = strip_ansi(line.rstrip("\n\r"))
     if cleaned:
         lines.append(cleaned)
+    return cleaned
 
 
 def process_snapshot(
@@ -334,11 +354,148 @@ def sync_can_start_locked() -> bool:
     return sync_backoff_remaining_seconds() <= 0
 
 
+def reset_sync_reconnect_loop_detector_locked() -> None:
+    sync_reconnect_loop_detector["last_event"] = None
+    sync_reconnect_loop_detector["pairs"] = 0
+    sync_reconnect_loop_detector["detected"] = False
+
+
+def sync_line_event(line: str) -> Optional[str]:
+    normalized = line.strip().lower()
+    if normalized == "connected.":
+        return "connected"
+    if normalized == "disconnected.":
+        return "disconnected"
+    if normalized == "reconnecting...":
+        return "reconnecting"
+    return None
+
+
+def observe_sync_output_line_locked(line: str) -> bool:
+    global sync_exit_reason
+
+    if sync_reconnect_loop_detector.get("detected"):
+        return False
+
+    event = sync_line_event(line)
+    if event is None:
+        return False
+
+    if event == "connected":
+        reset_sync_reconnect_loop_detector_locked()
+        return False
+
+    if event == "disconnected":
+        sync_reconnect_loop_detector["last_event"] = "disconnected"
+        return False
+
+    if sync_reconnect_loop_detector.get("last_event") == "disconnected":
+        sync_reconnect_loop_detector["pairs"] = int(sync_reconnect_loop_detector.get("pairs") or 0) + 1
+    sync_reconnect_loop_detector["last_event"] = "reconnecting"
+
+    if int(sync_reconnect_loop_detector.get("pairs") or 0) < SYNC_RECONNECT_LOOP_PAIRS:
+        return False
+
+    sync_reconnect_loop_detector["detected"] = True
+    sync_exit_reason = "reconnect_loop"
+    sync_control_state["last_reconnect_loop_at"] = now_iso()
+    append_process_line(
+        sync_lines,
+        (
+            "Detected repeated Disconnected/Reconnecting output; "
+            "stopping wacli sync so it cannot loop indefinitely."
+        ),
+    )
+    return True
+
+
+def reset_expired_session_retry_locked() -> None:
+    sync_control_state["expired_session_retry_pending"] = False
+    sync_control_state["expired_session_retry_in_progress"] = False
+    sync_control_state["expired_session_retry_attempted"] = False
+    sync_control_state["reauth_required"] = False
+
+
+def reset_sync_failure_state_locked() -> None:
+    global next_sync_start_monotonic, sync_exit_reason
+
+    reset_expired_session_retry_locked()
+    reset_sync_reconnect_loop_detector_locked()
+    next_sync_start_monotonic = 0.0
+    sync_exit_reason = None
+    sync_control_state["next_start_at"] = None
+    sync_control_state["last_failure"] = None
+    sync_control_state["restart_attempts"] = 0
+
+
+def schedule_expired_session_retry_locked() -> None:
+    global next_sync_start_monotonic
+
+    delay = SYNC_EXPIRED_SESSION_RETRY_SECONDS
+    next_sync_start_monotonic = time.monotonic() + delay
+    sync_control_state["next_start_at"] = future_iso(delay)
+    sync_control_state["last_failure"] = (
+        "wacli sync is stuck in a Disconnected/Reconnecting loop; "
+        "one delayed retry is scheduled."
+    )
+    sync_control_state["expired_session_retry_pending"] = True
+    sync_control_state["expired_session_retry_in_progress"] = False
+    sync_control_state["expired_session_retry_attempted"] = True
+    append_process_line(
+        sync_lines,
+        f"Will retry sync once in {delay} seconds before requiring a new WhatsApp login.",
+    )
+
+
+def require_reauth_after_expired_session_retry_locked(reason: str) -> str:
+    global next_sync_start_monotonic
+
+    next_sync_start_monotonic = 0.0
+    sync_control_state["next_start_at"] = None
+    sync_control_state["last_failure"] = reason
+    sync_control_state["expired_session_retry_pending"] = False
+    sync_control_state["expired_session_retry_in_progress"] = False
+    sync_control_state["expired_session_retry_attempted"] = True
+    sync_control_state["reauth_required"] = True
+    append_process_line(sync_lines, "Delayed sync retry did not recover; logging out and stopping retries.")
+    return reason
+
+
+def handle_expired_session_retry_exit_locked(exit_code: Optional[int]) -> Optional[str]:
+    if not sync_control_state.get("expired_session_retry_attempted"):
+        schedule_expired_session_retry_locked()
+        return None
+
+    return require_reauth_after_expired_session_retry_locked(
+        (
+            "wacli sync stayed stuck in a Disconnected/Reconnecting loop after the delayed retry. "
+            "The app logged out and needs a new WhatsApp Linked Devices login."
+        )
+    )
+
+
+def logout_after_expired_session_retry(reason: str) -> None:
+    try:
+        run_wacli_json(["auth", "logout"], timeout_seconds=30)
+        with state_lock:
+            append_process_line(sync_lines, "Logged out wacli after repeated reconnect-loop failure.")
+    except Exception as exc:
+        with state_lock:
+            append_process_line(sync_lines, f"Failed to log out wacli after reconnect-loop failure: {exc}")
+    finally:
+        invalidate_auth_status()
+
+    mark_connection_failure(reason, force_email=True)
+
+
 def record_sync_exit(exit_code: Optional[int]) -> None:
-    global next_sync_start_monotonic, sync_stop_expected, sync_started_monotonic
+    global next_sync_start_monotonic, sync_stop_expected, sync_started_monotonic, sync_exit_reason
+    logout_reason: Optional[str] = None
     with state_lock:
         expected = sync_stop_expected
         sync_stop_expected = False
+        exit_reason = sync_exit_reason
+        sync_exit_reason = None
         runtime_seconds = 0
         if sync_started_monotonic is not None:
             runtime_seconds = int(max(0, time.monotonic() - sync_started_monotonic))
@@ -350,22 +507,40 @@ def record_sync_exit(exit_code: Optional[int]) -> None:
         if expected or shutdown_requested.is_set():
             sync_control_state["last_failure"] = None
             sync_control_state["next_start_at"] = None
+            reset_expired_session_retry_locked()
             next_sync_start_monotonic = 0.0
             return
 
-        if runtime_seconds >= SYNC_STABLE_SECONDS:
-            sync_control_state["restart_attempts"] = 0
+        if exit_reason == "reconnect_loop":
+            logout_reason = handle_expired_session_retry_exit_locked(exit_code)
+        elif sync_control_state.get("expired_session_retry_in_progress") and runtime_seconds < SYNC_STABLE_SECONDS:
+            logout_reason = require_reauth_after_expired_session_retry_locked(
+                (
+                    f"wacli sync exited with code {exit_code} before the delayed retry was stable. "
+                    "The app logged out and needs a new WhatsApp Linked Devices login."
+                )
+            )
+        else:
+            if runtime_seconds >= SYNC_STABLE_SECONDS:
+                sync_control_state["restart_attempts"] = 0
+                reset_expired_session_retry_locked()
+            else:
+                sync_control_state["expired_session_retry_pending"] = False
+                sync_control_state["expired_session_retry_in_progress"] = False
 
-        sync_control_state["restart_attempts"] = int(sync_control_state.get("restart_attempts") or 0) + 1
-        attempts = int(sync_control_state["restart_attempts"])
-        delay = min(SYNC_RESTART_MAX_SECONDS, SYNC_RESTART_MIN_SECONDS * (2 ** (attempts - 1)))
-        next_sync_start_monotonic = time.monotonic() + delay
-        sync_control_state["next_start_at"] = future_iso(delay)
-        sync_control_state["last_failure"] = f"wacli sync exited with code {exit_code}"
-        append_process_line(
-            sync_lines,
-            f"Sync restart delayed for {delay} seconds after exit code {exit_code} (attempt {attempts}).",
-        )
+            sync_control_state["restart_attempts"] = int(sync_control_state.get("restart_attempts") or 0) + 1
+            attempts = int(sync_control_state["restart_attempts"])
+            delay = min(SYNC_RESTART_MAX_SECONDS, SYNC_RESTART_MIN_SECONDS * (2 ** (attempts - 1)))
+            next_sync_start_monotonic = time.monotonic() + delay
+            sync_control_state["next_start_at"] = future_iso(delay)
+            sync_control_state["last_failure"] = f"wacli sync exited with code {exit_code}"
+            append_process_line(
+                sync_lines,
+                f"Sync restart delayed for {delay} seconds after exit code {exit_code} (attempt {attempts}).",
+            )
+
+    if logout_reason:
+        logout_after_expired_session_retry(logout_reason)
 
 
 def wacli_base_cmd() -> list[str]:
@@ -400,8 +575,13 @@ def start_logged_process(
         assert proc.stdout is not None
         try:
             for raw_line in proc.stdout:
+                should_stop = False
                 with state_lock:
-                    append_process_line(lines, raw_line)
+                    cleaned = append_process_line(lines, raw_line)
+                    if name == "sync":
+                        should_stop = observe_sync_output_line_locked(cleaned)
+                if should_stop and proc.poll() is None:
+                    terminate_unexpected_process(proc)
         finally:
             proc.wait()
             with state_lock:
@@ -419,6 +599,9 @@ def handle_auth_exit(return_code: Optional[int]) -> None:
     invalidate_auth_status()
     if return_code != 0:
         return
+
+    with state_lock:
+        reset_sync_failure_state_locked()
 
     def export_after_auth() -> None:
         try:
@@ -444,6 +627,18 @@ def stop_process(proc: Optional[subprocess.Popen[str]], name: str, timeout: int 
     except subprocess.TimeoutExpired:
         proc.kill()
         proc.wait(timeout=timeout)
+
+
+def terminate_unexpected_process(proc: subprocess.Popen[str], timeout: int = 8) -> None:
+    proc.terminate()
+    try:
+        proc.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        proc.kill()
+        try:
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def run_wacli_json(args: list[str], timeout_seconds: int = 30) -> dict[str, Any]:
@@ -511,10 +706,19 @@ def start_sync_locked() -> bool:
         return False
     if process_running(auth_process):
         return False
+    if sync_exit_reason is not None:
+        return False
+    if sync_control_state.get("reauth_required"):
+        if not sync_lines or sync_lines[-1] != "Sync retries are stopped until WhatsApp is logged in again.":
+            append_process_line(sync_lines, "Sync retries are stopped until WhatsApp is logged in again.")
+        return False
     if not sync_can_start_locked():
         remaining = sync_backoff_remaining_seconds()
-        append_process_line(sync_lines, f"Sync restart backoff active; next attempt in {remaining} seconds.")
+        message = f"Sync restart backoff active; next attempt in {remaining} seconds."
+        if not sync_lines or sync_lines[-1] != message:
+            append_process_line(sync_lines, message)
         return False
+    retry_in_progress = bool(sync_control_state.get("expired_session_retry_pending"))
     command = wacli_base_cmd() + [
         "--lock-wait",
         "30s",
@@ -526,9 +730,12 @@ def start_sync_locked() -> bool:
         "--max-reconnect",
         SYNC_MAX_RECONNECT,
     ]
+    reset_sync_reconnect_loop_detector_locked()
     sync_process_started_at = now_iso()
     sync_started_monotonic = time.monotonic()
     sync_stop_expected = False
+    sync_control_state["expired_session_retry_pending"] = False
+    sync_control_state["expired_session_retry_in_progress"] = retry_in_progress
     sync_control_state["last_start_at"] = sync_process_started_at
     sync_control_state["next_start_at"] = None
     sync_control_state["last_failure"] = None
@@ -559,6 +766,20 @@ def start_sync_if_authenticated() -> None:
     if not AUTO_SYNC:
         return
     status = refresh_auth_status()
+    with state_lock:
+        retry_pending = bool(sync_control_state.get("expired_session_retry_pending"))
+        retry_due = retry_pending and sync_can_start_locked()
+        reauth_required = bool(sync_control_state.get("reauth_required"))
+
+    if reauth_required:
+        return
+
+    if retry_pending:
+        if retry_due:
+            with state_lock:
+                start_sync_locked()
+        return
+
     update_connection_health(status)
     if not status.get("authenticated"):
         return
@@ -570,6 +791,17 @@ def start_sync_if_authenticated() -> None:
 def update_connection_health(status: dict[str, Any]) -> None:
     if not AUTO_SYNC:
         return
+
+    with state_lock:
+        retry_waiting_or_running = bool(
+            sync_control_state.get("expired_session_retry_pending")
+            or sync_control_state.get("expired_session_retry_in_progress")
+        )
+        reauth_required = bool(sync_control_state.get("reauth_required"))
+
+    if retry_waiting_or_running and not reauth_required:
+        if not status.get("authenticated") or status.get("error"):
+            return
 
     if status.get("error"):
         mark_connection_failure(f"Unable to check WhatsApp authentication: {status['error']}")
@@ -592,6 +824,12 @@ def update_connection_health(status: dict[str, Any]) -> None:
             sync_control_state["restart_attempts"] = 0
             sync_control_state["next_start_at"] = None
             sync_control_state["last_failure"] = None
+            reset_expired_session_retry_locked()
+
+        if retry_waiting_or_running and not stable:
+            if sync_control_state.get("expired_session_retry_in_progress"):
+                sync_control_state["last_failure"] = "Delayed expired-session retry is still proving stable."
+            return
 
     if stable:
         mark_connection_restored()
@@ -977,10 +1215,10 @@ def api_auth_start() -> tuple[Any, int]:
 
 @app.post("/api/auth/logout")
 def api_auth_logout() -> tuple[Any, int]:
-    global auth_process, sync_process
     with state_lock:
         stop_process(auth_process, "auth")
         stop_process(sync_process, "sync")
+        reset_sync_failure_state_locked()
     try:
         payload = run_wacli_json(["auth", "logout"], timeout_seconds=30)
         invalidate_auth_status()
