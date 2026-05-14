@@ -54,6 +54,12 @@
 
   $: authIdentity = status?.auth?.linked_jid || status?.auth?.phone || '';
   $: authenticated = Boolean(status?.auth?.authenticated || authIdentity);
+  $: archivedMessageCount = Math.max(
+    Number(status?.export?.last_indexed_count || 0),
+    Number(totalMessages || 0)
+  );
+  $: hasBackedUpMessages = archivedMessageCount > 0 || chats.length > 0 || messages.length > 0;
+  $: showWorkspace = (authenticated && !authRunning) || hasBackedUpMessages;
   $: authLines = status?.auth_process?.lines || [];
   $: syncLines = status?.sync_process?.lines || [];
   $: syncRunning = Boolean(status?.sync_process?.running);
@@ -113,6 +119,8 @@
           : 'offline';
   $: statusSummary = authenticated
     ? `${statusLabel} | ${authIdentity || 'linked account'} | ${status?.export?.last_indexed_count || 0} text records`
+    : hasBackedUpMessages
+      ? `${statusLabel} | ${archivedMessageCount} backed-up records available`
     : statusLabel;
   $: selectedChatName = selectedChat
     ? chats.find((chat) => chat.jid === selectedChat)?.name || selectedChat
@@ -456,6 +464,8 @@
               <p>
                 {#if authenticated}
                   Linked account: {authIdentity || 'authenticated'}
+                {:else if hasBackedUpMessages}
+                  Backed-up messages remain available below. Start login to resume syncing new WhatsApp data.
                 {:else}
                   Start login and scan the QR code from WhatsApp Linked Devices.
                 {/if}
@@ -536,7 +546,7 @@
         </div>
       </section>
 
-      {#if authenticated && !authRunning}
+      {#if showWorkspace}
       <section class="workspace">
         <aside class="chat-pane">
           <div class="pane-toolbar">
