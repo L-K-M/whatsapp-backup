@@ -7,6 +7,9 @@ Dockerized WhatsApp backup service built around [`steipete/wacli`](https://githu
 
 ![Screenshot of the web UI](./screenshot.png)
 
+> [!IMPORTANT]
+> LLM Disclosure: This project was developed with the assistance of large language models (AI coding tools).
+
 ## What It Does
 
 - Runs in Docker with persistent storage for the visible text archive and private `wacli` state.
