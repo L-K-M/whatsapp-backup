@@ -38,6 +38,12 @@ docker compose up -d --build
 Update:
 
 ```bash
+sudo ./update.sh
+```
+
+Manual equivalent:
+
+```bash
 docker compose down
 docker compose build --no-cache
 docker compose up -d
