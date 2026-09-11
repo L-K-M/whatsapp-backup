@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1.7
 
-FROM golang:1.25-bookworm AS wacli-builder
+FROM golang:1.27-bookworm AS wacli-builder
 
 ARG WACLI_REPO=https://github.com/steipete/wacli.git
 ARG WACLI_REF=main
