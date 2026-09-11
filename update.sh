@@ -28,18 +28,23 @@ fi
 
 run_git fetch origin main
 
-# Local modifications would abort the pull. This is a deployment checkout
-# that tracks upstream, so save the diff to a patch and reset to origin/main.
-# Untracked files (.env, data/) are not touched.
-if ! run_git diff --quiet HEAD; then
+# Local modifications or unpushed local commits would be lost by the reset.
+# This is a deployment checkout that tracks upstream, so save the full delta
+# to a patch and reset to origin/main. Untracked files (.env, data/) are not
+# touched.
+if ! run_git diff --quiet origin/main; then
   backup="local-changes-$(date +%Y%m%d-%H%M%S).patch"
-  run_git diff HEAD >"$backup"
+  run_git diff origin/main >"$backup"
   echo "Saved local modifications to $backup"
 fi
 run_git reset --hard origin/main
 
-docker compose down
+# Build before stopping the old stack: on build failure the running service
+# stays up, and downtime is limited to the container recreation.
 docker compose build --no-cache
+docker compose down
 docker compose up -d
 
-echo "Updated and restarted. UI: http://<your-host-ip>:${WEB_PORT:-64009}"
+# Parse instead of sourcing .env (arbitrary shell); sudo scrubs the env.
+web_port="$(sed -n 's/^WEB_PORT=//p' .env | tail -n1 | tr -d "\"'")"
+echo "Updated and restarted. UI: http://<your-host-ip>:${web_port:-64009}"

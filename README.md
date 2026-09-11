@@ -38,7 +38,7 @@ docker compose up -d --build
 Update:
 
 ```bash
-./update.sh
+sudo ./update.sh
 ```
 
 Manual equivalent:
