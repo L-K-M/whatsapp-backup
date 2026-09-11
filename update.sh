@@ -35,6 +35,11 @@ run_git fetch origin main
 if ! run_git diff --quiet origin/main; then
   backup="local-changes-$(date +%Y%m%d-%H%M%S).patch"
   run_git diff origin/main >"$backup"
+  # Under sudo the redirect runs as root; keep the patch owned by the
+  # invoking user so they can read and delete it without sudo.
+  if [ -n "${SUDO_USER:-}" ]; then
+    chown "$SUDO_USER" "$backup"
+  fi
   echo "Saved local modifications to $backup"
 fi
 run_git reset --hard origin/main
