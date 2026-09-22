@@ -1,5 +1,8 @@
 # WhatsApp Backup
 
+> [!IMPORTANT]
+> LLM disclosure: This codebase was written with substantial help from large language models: AI coding agents working from the [`AGENTS.md`](AGENTS.md) brief in this repo.
+
 Dockerized WhatsApp backup service built around [`steipete/wacli`](https://github.com/steipete/wacli). It exposes a local web UI for QR login, sync status, browsing, and searching backed-up messages.
 
 > [!CAUTION]
