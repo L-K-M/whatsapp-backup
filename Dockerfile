@@ -15,7 +15,7 @@ RUN go build -tags sqlite_fts5 -o /out/wacli ./cmd/wacli \
     && strip /out/wacli
 
 
-FROM node:22-bookworm-slim AS web-builder
+FROM node:26-bookworm-slim AS web-builder
 
 WORKDIR /src/whatsapp-backup/ui
 COPY ui/package*.json ./
