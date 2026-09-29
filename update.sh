@@ -4,7 +4,8 @@
 # The Dockerfile clones upstream wacli from the WACLI_REF *branch* at build
 # time, so a plain `docker compose build` would reuse the cached layer and
 # keep the old wacli build. `--no-cache` is therefore required on every
-# update.
+# update. `--pull` covers the other stale layer: it refetches the FROM base
+# image, which `--no-cache` alone leaves cached forever.
 #
 # Usage: sudo ./update.sh
 set -euo pipefail
@@ -46,7 +47,7 @@ run_git reset --hard origin/main
 
 # Build before stopping the old stack: on build failure the running service
 # stays up, and downtime is limited to the container recreation.
-docker compose build --no-cache
+docker compose build --no-cache --pull
 docker compose down
 docker compose up -d
 
