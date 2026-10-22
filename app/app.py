@@ -679,7 +679,8 @@ def refresh_auth_status(force: bool = False) -> dict[str, Any]:
         "error": None,
     }
     try:
-        payload = run_wacli_json(["auth", "status"], timeout_seconds=20)
+        # Status must not open or upgrade a second writable store during sync.
+        payload = run_wacli_json(["--read-only", "auth", "status"], timeout_seconds=20)
         data = payload.get("data") if isinstance(payload, dict) else {}
         if isinstance(data, dict):
             status.update(data)

@@ -19,14 +19,15 @@ Runs on every pull request and on every push to `main`. It has two jobs:
 
 - **Python checks** — sets up Python 3.12, installs `requirements.txt`
   (Flask), then runs `python -m compileall app` as a fast syntax check of the
-  Python sources. There is no test suite or linter config in the repo, so this
-  is the lightweight gate that the code at least parses.
+  Python sources.
 - **Build Docker image** — builds the image with
   `docker/build-push-action@v6` using `push: false` / `load: false`, so every
   PR proves the multi-stage image still builds without publishing anything. The
   build context is the **repository root** (`.`) and the file is the root
   `Dockerfile`, which copies `requirements.txt`, `app/`, `ui/`, and `media/`.
-  The image exposes port `8080`. GitHub Actions layer caching (`type=gha`) keeps
+  The build runs `tests/` against the compiled `wacli`, including authentication
+  checks during a session write. The image exposes port `8080`.
+  GitHub Actions layer caching (`type=gha`) keeps
   rebuilds fast.
 
 ### Running locally
