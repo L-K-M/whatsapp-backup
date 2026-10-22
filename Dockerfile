@@ -11,6 +11,10 @@ RUN apt-get update \
 
 WORKDIR /src/wacli
 RUN git clone --depth 1 --branch "${WACLI_REF}" "${WACLI_REPO}" .
+COPY patches/wacli /tmp/wacli-patches
+RUN git apply /tmp/wacli-patches/session-sqlite.patch \
+    && cp /tmp/wacli-patches/session_sqlite_test.go internal/wa/backup_session_sqlite_test.go \
+    && go test -tags sqlite_fts5 ./internal/wa
 RUN go build -tags sqlite_fts5 -o /out/wacli ./cmd/wacli \
     && strip /out/wacli
 

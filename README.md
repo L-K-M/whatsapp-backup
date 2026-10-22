@@ -87,6 +87,8 @@ Key `.env` values:
 - `SYNC_EXPIRED_SESSION_RETRY_SECONDS`: delay before one final retry after a stuck reconnect loop. Default: `10800` (3 hours).
 - `WACLI_REPO` / `WACLI_REF`: source used to build `wacli` into the image.
 
+The image applies `patches/wacli/session-sqlite.patch` to prevent session database lock errors during login and sync. Each build tests concurrent session reads and writes against the patched source, including an existing session database.
+
 ## SMTP Alerts
 
 Set these values in `.env` to receive an email when a previously restored WhatsApp connection fails:

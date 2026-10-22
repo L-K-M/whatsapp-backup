@@ -2,5 +2,4 @@
 
 ## Unreleased
 
-- No changes recorded yet. Earlier history lives in the commit log and any
-  GitHub releases; future changes will be noted here.
+- Prevent login-time SQLite locks in the `wacli` session store.

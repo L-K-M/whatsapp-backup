@@ -1,0 +1,24 @@
+diff --git a/internal/wa/session.go b/internal/wa/session.go
+index 360905d..9c86f71 100644
+--- a/internal/wa/session.go
++++ b/internal/wa/session.go
+@@ -14,6 +14,10 @@ import (
+ 	"go.mau.fi/whatsmeow/types/events"
+ )
+ 
++// WAL keeps session reads available during imports. Immediate transactions
++// avoid read-to-write lock upgrades between concurrent sync workers.
++const sessionSQLiteParams = "_foreign_keys=on&_busy_timeout=5000&_journal_mode=WAL&_txlock=immediate"
++
+ func (c *Client) init() (err error) {
+ 	c.mu.Lock()
+ 	defer c.mu.Unlock()
+@@ -23,7 +27,7 @@ func (c *Client) init() (err error) {
+ 	if err := sqliteutil.ChmodFiles(c.opts.StorePath, 0o600); err != nil {
+ 		return err
+ 	}
+-	container, err := sqlstore.New(ctx, "sqlite3", sqliteutil.FileURI(c.opts.StorePath, "_foreign_keys=on"), dbLog)
++	container, err := sqlstore.New(ctx, "sqlite3", sqliteutil.FileURI(c.opts.StorePath, sessionSQLiteParams), dbLog)
+ 	if err != nil {
+ 		return fmt.Errorf("open whatsmeow store: %w", err)
+ 	}
