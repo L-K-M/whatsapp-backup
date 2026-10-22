@@ -89,6 +89,8 @@ Key `.env` values:
 
 The image applies `patches/wacli/session-sqlite.patch` to prevent session database lock errors during login and sync. Each build tests concurrent session reads and writes against the patched source, including an existing session database.
 
+Authentication checks use `wacli --read-only auth status` to avoid competing with sync writes. Each build tests this with the compiled CLI while a session write remains open.
+
 ## SMTP Alerts
 
 Set these values in `.env` to receive an email when a previously restored WhatsApp connection fails:

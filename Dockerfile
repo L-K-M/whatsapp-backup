@@ -55,6 +55,9 @@ COPY app /app/app
 COPY --from=web-builder /src/whatsapp-backup/ui/dist /app/web
 COPY --from=wacli-builder /out/wacli /usr/local/bin/wacli
 
+RUN --mount=type=bind,source=tests,target=/tmp/tests \
+    python -m unittest discover -s /tmp/tests -v
+
 RUN chmod -R a+rX /app \
     && chmod 755 /usr/local/bin/wacli \
     && mkdir -p /data/wacli /data/state /host-data/archive/messages \
