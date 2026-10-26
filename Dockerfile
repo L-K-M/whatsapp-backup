@@ -26,7 +26,13 @@ COPY ui/package*.json ./
 RUN if [ -f package-lock.json ]; then npm ci --ignore-scripts; else npm install --ignore-scripts; fi
 COPY media /src/whatsapp-backup/media
 COPY ui ./
-RUN npm run build
+# The build also writes dist/Third-Party-Notices.txt and fails when a bundled
+# package or font has no license text. Each script carries a banner that
+# points to that file.
+RUN npm run build \
+    && test -s dist/Third-Party-Notices.txt \
+    && test -n "$(find dist/assets -name '*.js' -print -quit)" \
+    && if grep -L 'Third-Party-Notices.txt' dist/assets/*.js | grep .; then exit 1; fi
 
 
 FROM python:3.14-slim-bookworm AS runtime
