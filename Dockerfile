@@ -28,7 +28,8 @@ COPY media /src/whatsapp-backup/media
 COPY ui ./
 # The build also writes dist/Third-Party-Notices.txt and fails when a bundled
 # package or font has no license text. Each script carries a banner that
-# points to that file.
+# points to that file. The build script passes `--repo ..` so media/ counts
+# as own code: the build context has no .git to mark the repository root.
 RUN npm run build \
     && test -s dist/Third-Party-Notices.txt \
     && test -n "$(find dist/assets -name '*.js' -print -quit)" \
