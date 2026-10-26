@@ -26,6 +26,14 @@ jobs:
       - name: Compile sources (syntax check)
         run: python -m compileall app
 
+      # docker/metadata-action labels images with the repository license
+      # alone. The image bundles more, so the Dockerfile states the full
+      # expression and the release workflow must pass it through.
+      - name: Check the image license label is declared
+        run: |
+          python3 scripts/licenses/oci-licenses.py dockerfile Dockerfile
+          grep -q 'image.licenses=.*steps.oci.outputs.licenses' .github/workflows/release.yml
+
   docker:
     name: Build Docker image
     runs-on: ubuntu-latest
