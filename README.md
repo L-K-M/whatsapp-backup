@@ -138,3 +138,25 @@ DATA_DIR=./data WACLI_STORE_DIR=./data/wacli ARCHIVE_DIR=./data/archive WACLI_BI
 - WhatsApp Web history sync is best-effort. The primary phone may need to be online for older history to arrive.
 - Downloaded media availability depends on WhatsApp media metadata and `wacli` being authenticated.
 - The browser/search API reads the plain-text archive files, not `wacli.db`.
+
+## License
+
+whatsapp-backup's own code is released under the [Unlicense](LICENSE). The
+Docker image adds third-party software that keeps its own licenses:
+`wacli` (MIT License), built with Go, the Go standard library and Go
+modules, among them whatsmeow (MPL-2.0) and libsignal (GPL-3.0-only); the
+web UI's Svelte, markdown-it and other npm packages, and the Sysfont and
+Geneva 9.1 fonts (SIL Open Font License 1.1); Flask and its Python
+dependencies; and tini. Because `wacli` links libsignal, the `wacli` binary
+is distributed under GPL-3.0-only as a combined work; the source pointers
+for it and its modules are in `Third-Party-Notices.txt`. `patches/wacli/`
+modifies wacli's MIT-licensed source.
+
+The notices ship in the image in `/usr/share/doc/whatsapp-backup/`:
+`Third-Party-Notices.txt` for `wacli`, its Go modules and the web UI, and
+`OS-Packages.txt` for the system packages, with their exact source versions.
+The web UI also serves its own notices at `/Third-Party-Notices.txt`. Flask
+and the other Python packages keep their license files in their
+`.dist-info` directories, and CPython's license is in
+`/usr/local/lib/python3.*/LICENSE.txt`. System packages from the base image
+keep their notices in `/usr/share/doc/*/copyright`.
