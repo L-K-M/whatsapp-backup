@@ -45,6 +45,28 @@ jobs:
           labels: |
             org.opencontainers.image.licenses=${{ steps.oci.outputs.licenses }}
 
+      # Check the image before anything is pushed: a local build (the push
+      # build below reuses its cache) whose notices and license label
+      # scripts/licenses/check-image-notices.sh verifies.
+      - name: Build image for checks
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: whatsapp-backup:check
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # tini: MIT, installed by name for PID 1.
+      - name: Verify notices in the image
+        run: |
+          sh scripts/licenses/check-image-notices.sh whatsapp-backup:check /usr/share/doc/whatsapp-backup \
+            Third-Party-Notices.txt OS-Packages.txt LICENSE \
+            -- --own Unlicense --package tini=MIT
+          docker run --rm --entrypoint test whatsapp-backup:check -s /app/web/Third-Party-Notices.txt
+
       - name: Build and push
         uses: docker/build-push-action@v7
         with:

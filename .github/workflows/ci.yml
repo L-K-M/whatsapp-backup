@@ -49,12 +49,25 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
+      # Loaded into the local daemon (still not pushed) so the next step can
+      # look inside it.
       - name: Build image (no push)
         uses: docker/build-push-action@v7
         with:
           context: .
           file: Dockerfile
           push: false
-          load: false
+          load: true
+          tags: whatsapp-backup:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      # The image carries the notices of wacli, its Go modules, the web UI and
+      # the OS packages, and its license label names every license they list.
+      # tini: MIT, installed by name for PID 1.
+      - name: Verify notices in the image
+        run: |
+          sh scripts/licenses/check-image-notices.sh whatsapp-backup:ci /usr/share/doc/whatsapp-backup \
+            Third-Party-Notices.txt OS-Packages.txt LICENSE \
+            -- --own Unlicense --package tini=MIT
+          docker run --rm --entrypoint test whatsapp-backup:ci -s /app/web/Third-Party-Notices.txt
