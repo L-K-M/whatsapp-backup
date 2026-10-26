@@ -34,6 +34,12 @@ jobs:
           python3 scripts/licenses/oci-licenses.py dockerfile Dockerfile
           grep -q 'image.licenses=.*steps.oci.outputs.licenses' .github/workflows/release.yml
 
+      # The UI package is whatsapp-backup's own code, so its manifest states
+      # the root license (LICENSE, Unlicense).
+      - name: Check the UI package license
+        run: |
+          grep -q '"license": "Unlicense"' ui/package.json
+
   docker:
     name: Build Docker image
     runs-on: ubuntu-latest
