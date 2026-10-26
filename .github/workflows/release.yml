@@ -16,6 +16,15 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # The Dockerfile's license label names the image's contents; without
+      # passing it through, metadata-action would claim only the
+      # repository's license for the whole image.
+      - name: Read the image license label
+        id: oci
+        run: |
+          licenses=$(python3 scripts/licenses/oci-licenses.py dockerfile Dockerfile)
+          echo "licenses=$licenses" >> "$GITHUB_OUTPUT"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
 
@@ -35,6 +44,30 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest,enable=${{ !contains(github.ref_name, '-') }}
+          labels: |
+            org.opencontainers.image.licenses=${{ steps.oci.outputs.licenses }}
+
+      # Check the image before anything is pushed: a local build (the push
+      # build below reuses its cache) whose notices and license label
+      # scripts/licenses/check-image-notices.sh verifies.
+      - name: Build image for checks
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: Dockerfile
+          load: true
+          tags: whatsapp-backup:check
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # tini: MIT, installed by name for PID 1.
+      - name: Verify notices in the image
+        run: |
+          sh scripts/licenses/check-image-notices.sh whatsapp-backup:check /usr/share/doc/whatsapp-backup \
+            Third-Party-Notices.txt OS-Packages.txt LICENSE \
+            -- --own Unlicense --package tini=MIT
+          docker run --rm --entrypoint test whatsapp-backup:check -s /app/web/Third-Party-Notices.txt
 
       - name: Build and push
         uses: docker/build-push-action@v7

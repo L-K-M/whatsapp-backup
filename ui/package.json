@@ -2,10 +2,11 @@
   "name": "whatsapp-backup-ui",
   "private": true,
   "version": "0.1.0",
+  "license": "Unlicense",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/third-party-notices.mjs --repo .. --modules node_modules/.cache/bundled-modules --config third-party-notices.jsonc --check-assets dist --title \"whatsapp-backup web UI\" --out dist/Third-Party-Notices.txt",
     "preview": "vite preview"
   },
   "dependencies": {

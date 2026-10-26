@@ -170,3 +170,20 @@ may waive review; report that waiver rather than claiming review passed.
 
 <!-- shared-rules:end -->
 
+## Licensing
+
+- whatsapp-backup's own code is Unlicense (`LICENSE`). Keep the README
+  License section and the image's `org.opencontainers.image.licenses`
+  label (Dockerfile `LABEL`, passed through by `release.yml`) consistent
+  with it and with what the image bundles.
+- Before adding a dependency, vendored file or bundled asset (fonts, images,
+  icons, data), confirm its license allows redistribution in the image.
+  Never vendor third-party code without its license file.
+- The image build writes `Third-Party-Notices.txt` from the real dependency
+  set: `scripts/licenses/go-dart-notices.py` for the `wacli` binary
+  (overrides in `licenses/go-overrides.json`) and
+  `ui/scripts/third-party-notices.mjs` for the web UI (overrides in
+  `ui/third-party-notices.jsonc`). Both fail on a component without license
+  text; record gaps as explicit overrides with a reason. Keep the CI notice
+  checks passing; when the bundled licenses change, set the Dockerfile label
+  to the expression `scripts/licenses/check-image-notices.sh` prints.

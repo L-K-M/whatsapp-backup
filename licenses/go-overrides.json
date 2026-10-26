@@ -1,0 +1,11 @@
+// Overrides for scripts/licenses/go-dart-notices.py, which writes the
+// notices of the wacli binary built in the Dockerfile. Every entry needs a
+// reason; an entry that matches no linked module prints a warning.
+{
+  "components": [
+    // GPL texts never say "-only" or "-or-later"; the generator refuses to
+    // guess. whatsmeow links libsignal, so wacli is a GPL-3.0 combined work.
+    {"name": "go.mau.fi/libsignal", "version": "v0.2.*", "license": "GPL-3.0-only",
+     "reason": "LICENSE at v0.2.2 is the GPLv3 text; no file header, README or CREDITS grants 'any later version', so -only is the conservative id"}
+  ]
+}
