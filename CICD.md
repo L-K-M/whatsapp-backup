@@ -23,7 +23,7 @@ Runs on every pull request and on every push to `main`. It has two jobs:
   license label, that `release.yml` passes it through, and that
   `ui/package.json` states the Unlicense.
 - **Build Docker image** — builds the image with
-  `docker/build-push-action@v6` using `push: false` / `load: false`, so every
+  `docker/build-push-action@v7` using `push: false`, so every
   PR proves the multi-stage image still builds without publishing anything. The
   build context is the **repository root** (`.`) and the file is the root
   `Dockerfile`, which copies `requirements.txt`, `app/`, `ui/`, and `media/`.
