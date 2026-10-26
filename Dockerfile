@@ -94,6 +94,9 @@ COPY --from=wacli-builder /out/wacli /usr/local/bin/wacli
 # Third-party notices and the project's own license, next to OS-Packages.txt.
 COPY --from=notices /out/notices/ /usr/share/doc/whatsapp-backup/
 COPY LICENSE /usr/share/doc/whatsapp-backup/LICENSE
+# whatsapp-backup's own code is Unlicense; the other terms come from the
+# notices above (scripts/licenses/oci-licenses.py expr). tini is MIT.
+LABEL org.opencontainers.image.licenses="Unlicense AND Apache-2.0 AND BSD-2-Clause AND BSD-3-Clause AND GPL-3.0-only AND ISC AND MIT AND MPL-2.0 AND OFL-1.1"
 
 # The image must carry its notices: fail when one is missing or empty, or
 # lacks a component the README names for its terms. CPython's license comes
