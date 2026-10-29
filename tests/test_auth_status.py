@@ -87,6 +87,7 @@ class AuthStatusTests(unittest.TestCase):
 class AuthStatusErrorAlertTests(unittest.TestCase):
     def setUp(self):
         backup.auth_status_error_streak = 0
+        self.addCleanup(setattr, backup, "auth_status_error_streak", 0)
         self.enterContext(mock.patch.object(backup, "AUTO_SYNC", True))
         self.enterContext(mock.patch.object(backup, "AUTH_STATUS_ERROR_THRESHOLD", 3))
 
@@ -105,6 +106,8 @@ class AuthStatusErrorAlertTests(unittest.TestCase):
 
             self.check_once()
             failure.assert_called_once()
+            self.check_once()
+            self.assertEqual(failure.call_count, 2)
 
     def test_successful_check_resets_the_error_streak(self):
         backup.auth_status_error_streak = 2

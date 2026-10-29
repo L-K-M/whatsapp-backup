@@ -814,8 +814,8 @@ def update_connection_health(status: dict[str, Any]) -> None:
             if streak < AUTH_STATUS_ERROR_THRESHOLD:
                 append_process_line(
                     sync_lines,
-                    f"Authentication status check failed ({streak}/{AUTH_STATUS_ERROR_THRESHOLD}); "
-                    "an outage email is sent only if failures persist.",
+                    f"Authentication status check failed ({streak}/{AUTH_STATUS_ERROR_THRESHOLD}): "
+                    f"{status['error']}; an outage email is sent only if failures persist.",
                 )
         if streak >= AUTH_STATUS_ERROR_THRESHOLD:
             mark_connection_failure(f"Unable to check WhatsApp authentication: {status['error']}")
