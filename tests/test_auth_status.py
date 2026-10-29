@@ -82,3 +82,46 @@ class AuthStatusTests(unittest.TestCase):
 
         self.assertFalse(status["authenticated"])
         self.assertIn("not a database", status["error"])
+
+
+class AuthStatusErrorAlertTests(unittest.TestCase):
+    def setUp(self):
+        backup.auth_status_error_streak = 0
+        self.enterContext(mock.patch.object(backup, "AUTO_SYNC", True))
+        self.enterContext(mock.patch.object(backup, "AUTH_STATUS_ERROR_THRESHOLD", 3))
+
+    def check_once(self):
+        backup.update_connection_health(backup.refresh_auth_status(force=True))
+
+    def test_single_check_error_does_not_page(self):
+        with (
+            mock.patch.object(backup, "run_wacli_json", side_effect=RuntimeError("timed out")),
+            mock.patch.object(backup, "mark_connection_failure") as failure,
+        ):
+            self.check_once()
+            self.check_once()
+            failure.assert_not_called()
+            self.assertEqual(backup.auth_status_error_streak, 2)
+
+            self.check_once()
+            failure.assert_called_once()
+
+    def test_successful_check_resets_the_error_streak(self):
+        backup.auth_status_error_streak = 2
+        with (
+            mock.patch.object(backup, "run_wacli_json", return_value={"data": {"authenticated": True}}),
+            mock.patch.object(backup, "mark_connection_failure") as failure,
+        ):
+            self.check_once()
+
+        self.assertEqual(backup.auth_status_error_streak, 0)
+        failure.assert_not_called()
+
+    def test_unauthenticated_status_still_pages_immediately(self):
+        with (
+            mock.patch.object(backup, "run_wacli_json", return_value={"data": {"authenticated": False}}),
+            mock.patch.object(backup, "mark_connection_failure") as failure,
+        ):
+            self.check_once()
+
+        failure.assert_called_once()
