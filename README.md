@@ -85,6 +85,7 @@ Key `.env` values:
 - `SYNC_STABLE_SECONDS`: running sync duration required before the app treats the connection as restored and resets alert/backoff state. Default: `300`.
 - `SYNC_RECONNECT_LOOP_PAIRS`: number of repeated `Disconnected.` / `Reconnecting...` pairs that indicate a stuck sync session. Default: `3`.
 - `SYNC_EXPIRED_SESSION_RETRY_SECONDS`: delay before one final retry after a stuck reconnect loop. Default: `10800` (3 hours).
+- `AUTH_STATUS_ERROR_THRESHOLD`: consecutive failed authentication checks before they count as an outage. A single transient check error does not alert; a definitive "not authenticated" result still alerts immediately. Default: `4`.
 - `WACLI_REPO` / `WACLI_REF`: source used to build `wacli` into the image.
 
 The image applies `patches/wacli/session-sqlite.patch` to prevent session database lock errors during login and sync. Each build tests concurrent session reads and writes against the patched source, including an existing session database.

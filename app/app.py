@@ -49,6 +49,7 @@ SYNC_EXPIRED_SESSION_RETRY_SECONDS = max(
     60,
     int(os.environ.get("SYNC_EXPIRED_SESSION_RETRY_SECONDS", "10800")),
 )
+AUTH_STATUS_ERROR_THRESHOLD = max(1, int(os.environ.get("AUTH_STATUS_ERROR_THRESHOLD", "4")))
 NOTIFICATION_STATE_FILE = Path(
     os.environ.get("NOTIFICATION_STATE_FILE", str(DATA_DIR / ".whatsapp-backup-state.json"))
 ).resolve()
@@ -86,6 +87,7 @@ auth_status_cache: dict[str, Any] = {
     "error": None,
 }
 auth_status_checked_monotonic = 0.0
+auth_status_error_streak = 0
 
 export_state: dict[str, Any] = {
     "last_export_at": None,
@@ -790,6 +792,7 @@ def start_sync_if_authenticated() -> None:
 
 
 def update_connection_health(status: dict[str, Any]) -> None:
+    global auth_status_error_streak
     if not AUTO_SYNC:
         return
 
@@ -805,8 +808,21 @@ def update_connection_health(status: dict[str, Any]) -> None:
             return
 
     if status.get("error"):
-        mark_connection_failure(f"Unable to check WhatsApp authentication: {status['error']}")
+        with state_lock:
+            auth_status_error_streak += 1
+            streak = auth_status_error_streak
+            if streak < AUTH_STATUS_ERROR_THRESHOLD:
+                append_process_line(
+                    sync_lines,
+                    f"Authentication status check failed ({streak}/{AUTH_STATUS_ERROR_THRESHOLD}): "
+                    f"{status['error']}; an outage email is sent only if failures persist.",
+                )
+        if streak >= AUTH_STATUS_ERROR_THRESHOLD:
+            mark_connection_failure(f"Unable to check WhatsApp authentication: {status['error']}")
         return
+
+    with state_lock:
+        auth_status_error_streak = 0
 
     if not status.get("authenticated"):
         mark_connection_failure("WhatsApp is no longer authenticated. Re-link the device from the web UI.")
